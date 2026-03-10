@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpiroPlotter Studio</title>
+    
+    <!-- Tailwind CSS per lo stile grafico -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React e ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel per compilare il codice React direttamente nel browser -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        /* Stile personalizzato per la barra di scorrimento */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(30, 41, 59, 0.5);
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 overflow-hidden">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback } = React;
+
+        // --- ICONE SVG (Sostituiscono la libreria esterna per funzionare offline) ---
+        const iconePath = {
+            play: '<polygon points="5 3 19 12 5 21 5 3"></polygon>',
+            pause: '<rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect>',
+            trash: '<polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>',
+            download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line>',
+            save: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline>',
+            upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line>',
+            plus: '<line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line>',
+            settings: '<circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>',
+            pen: '<path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path><path d="M2 2l7.586 7.586"></path><circle cx="11" cy="11" r="2"></circle>',
+            rotate: '<polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>',
+            fastForward: '<polygon points="13 19 22 12 13 5 13 19"></polygon><polygon points="2 19 11 12 2 5 2 19"></polygon>',
+            alert: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line>',
+            undo: '<polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>',
+            globe: '<circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>'
+        };
+
+        const Icon = ({ nome, className }) => (
+            <svg 
+                className={className} 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                dangerouslySetInnerHTML={{ __html: iconePath[nome] }} 
+            />
+        );
+
+        // --- DIZIONARIO MULTILINGUA ---
+        const TRANSLATIONS = {
+            en: {
+                appName: "SpiroPlotter Studio",
+                projectName: "Project Name",
+                placeholder: "My Drawing",
+                start: "Start",
+                pause: "Pause",
+                clear: "Clear",
+                undo: "Undo",
+                timeAcc: "Time Accelerator",
+                paperProp: "Canvas Properties",
+                paperColor: "Paper Color",
+                rotSpeed: "Rotation Speed",
+                width: "Width (px)",
+                height: "Height (px)",
+                penTool: "Pen Tool",
+                penHint: "Pause to change pen without smudging.",
+                inkColor: "Ink Color",
+                thickness: "Thickness",
+                kinematics: "Arm Kinematics",
+                add: "Add",
+                radLen: "Radius / Length",
+                motSpeed: "Motor Speed",
+                phase: "Joint Phase",
+                expSvg: "Export SVG",
+                saveSetup: "Save Setup",
+                loadSetup: "Load Setup",
+                completed: "Drawing Completed!",
+                cycleMsg: "The machine completed a cycle. It stopped automatically to prevent double lines.",
+                ok: "Ok",
+                pressStart: "Press 'Start' to begin",
+                configHint: "Configure gears and pens from the side panel. Scroll to zoom. Drag the origin to move it.",
+                errLoad: "Error loading configuration file.",
+                noDraw: "No drawing to export."
+            },
+            it: {
+                appName: "SpiroPlotter Studio",
+                projectName: "Nome Progetto",
+                placeholder: "Il mio disegno",
+                start: "Avvia",
+                pause: "Pausa",
+                clear: "Pulisci",
+                undo: "Annulla",
+                timeAcc: "Acceleratore Temporale",
+                paperProp: "Proprietà Foglio",
+                paperColor: "Colore Carta",
+                rotSpeed: "Velocità Rotazione",
+                width: "Larghezza (px)",
+                height: "Altezza (px)",
+                penTool: "Strumento Penna",
+                penHint: "Metti in pausa per cambiare penna senza sbavature.",
+                inkColor: "Colore Inchiostro",
+                thickness: "Spessore",
+                kinematics: "Cinematica Bracci",
+                add: "Aggiungi",
+                radLen: "Raggio / Lunghezza",
+                motSpeed: "Velocità Motore",
+                phase: "Sfasamento Snodo",
+                expSvg: "Esporta SVG",
+                saveSetup: "Salva Setup",
+                loadSetup: "Carica Setup",
+                completed: "Disegno Completato!",
+                cycleMsg: "La macchina ha completato un ciclo. Si è fermata in automatico per evitare doppie tracce.",
+                ok: "Ok",
+                pressStart: "Premi 'Avvia' per iniziare",
+                configHint: "Configura ruote e penne dal pannello. Usa la rotellina per lo zoom. Trascina l'origine per spostarla.",
+                errLoad: "Errore nel caricamento del file di configurazione.",
+                noDraw: "Nessun disegno da esportare."
+            }
+        };
+
+        // --- CONFIGURAZIONI DI DEFAULT ---
+        const CONFIG_INIZIALE_FOGLIO = {
+            larghezza: 800,
+            altezza: 800,
+            colore: '#fdf6e3', 
+            velocitaRotazione: 0.2 
+        };
+
+        const CONFIG_INIZIALE_PENNA = {
+            colore: '#002b36', 
+            spessore: 1.5
+        };
+
+        const RUOTE_DI_DEFAULT = [
+            { id: '1', raggio: 150, velocita: 1.5, fase: 0 },
+            { id: '2', raggio: -80, velocita: -2.3, fase: Math.PI / 2 },
+            { id: '3', raggio: 40, velocita: 5.1, fase: 0 }
+        ];
+
+        function App() {
+            // --- STATO APPLICAZIONE ---
+            const [lang, setLang] = useState('en');
+            const t = TRANSLATIONS[lang];
+
+            const [inRiproduzione, setInRiproduzione] = useState(false);
+            const [foglio, setFoglio] = useState(CONFIG_INIZIALE_FOGLIO);
+            const [penna, setPenna] = useState(CONFIG_INIZIALE_PENNA);
+            const [ruote, setRuote] = useState(RUOTE_DI_DEFAULT);
+            const [velocitaAnimazione, setVelocitaAnimazione] = useState(1);
+            const [avvisoCiclo, setAvvisoCiclo] = useState(false);
+            const [nomeProgetto, setNomeProgetto] = useState(t.placeholder);
+            
+            const [zoom, setZoom] = useState(1);
+            const [origineMeccanica, setOrigineMeccanica] = useState({ x: 0, y: 0 });
+            
+            const [isHoverOrigine, setIsHoverOrigine] = useState(false);
+            const [isDraggingOrigine, setIsDraggingOrigine] = useState(false);
+
+            // Riferimenti simulazione
+            const statoSimulazione = useRef({
+                tempo: 0,
+                ultimoTempo: 0,
+                percorsi: [], 
+                percorsoCorrente: null,
+                ultimoPunto: null,
+                riferimentoCiclo: null 
+            });
+
+            const canvasRef = useRef(null);
+            const contenitoreRef = useRef(null);
+            const bufferCanvasRef = useRef(document.createElement('canvas')); 
+            const requestRef = useRef();
+
+            // Inizializzazione Buffer
+            useEffect(() => {
+                const buffer = bufferCanvasRef.current;
+                buffer.width = foglio.larghezza;
+                buffer.height = foglio.altezza;
+                ridisegnaTuttoSuBuffer();
+            }, [foglio.larghezza, foglio.altezza, foglio.colore]);
+
+            // Gestione cambio penna
+            useEffect(() => {
+                iniziaNuovoPercorso();
+            }, [penna]);
+
+            // Reset ciclo
+            useEffect(() => {
+                statoSimulazione.current.riferimentoCiclo = null;
+                setAvvisoCiclo(false);
+            }, [ruote, foglio.velocitaRotazione, origineMeccanica]);
+
+            const iniziaNuovoPercorso = () => {
+                const state = statoSimulazione.current;
+                const nuovoPercorso = {
+                    colore: penna.colore,
+                    spessore: penna.spessore,
+                    punti: [],
+                    tempoInizio: state.tempo
+                };
+                state.percorsi.push(nuovoPercorso);
+                state.percorsoCorrente = nuovoPercorso;
+                state.ultimoPunto = null;
+            };
+
+            const ridisegnaTuttoSuBuffer = () => {
+                const buffer = bufferCanvasRef.current;
+                const ctx = buffer.getContext('2d');
+                
+                ctx.fillStyle = foglio.colore;
+                ctx.fillRect(0, 0, buffer.width, buffer.height);
+                
+                const { percorsi } = statoSimulazione.current;
+                ctx.lineJoin = 'round';
+                ctx.lineCap = 'round';
+
+                percorsi.forEach(p => {
+                    if (p.punti.length < 2) return;
+                    ctx.beginPath();
+                    ctx.strokeStyle = p.colore;
+                    ctx.lineWidth = p.spessore;
+                    ctx.moveTo(p.punti[0].x + buffer.width / 2, p.punti[0].y + buffer.height / 2);
+                    for (let i = 1; i < p.punti.length; i++) {
+                        ctx.lineTo(p.punti[i].x + buffer.width / 2, p.punti[i].y + buffer.height / 2);
+                    }
+                    ctx.stroke();
+                });
+            };
+
+            const pulisciFoglio = () => {
+                const state = statoSimulazione.current;
+                state.percorsi = [];
+                state.percorsoCorrente = null;
+                state.ultimoPunto = null;
+                state.riferimentoCiclo = null;
+                state.tempo = 0;
+                setAvvisoCiclo(false);
+                iniziaNuovoPercorso();
+                ridisegnaTuttoSuBuffer();
+            };
+
+            const handleUndo = () => {
+                const state = statoSimulazione.current;
+                if (state.percorsi.length === 0) return;
+
+                let rimosso = state.percorsi.pop();
+                while(rimosso && rimosso.punti.length === 0 && state.percorsi.length > 0) {
+                    rimosso = state.percorsi.pop();
+                }
+
+                if (!rimosso || (state.percorsi.length === 0 && rimosso.punti.length === 0)) {
+                    pulisciFoglio();
+                    return;
+                }
+
+                state.tempo = rimosso.tempoInizio;
+                state.riferimentoCiclo = null;
+                setAvvisoCiclo(false);
+
+                iniziaNuovoPercorso();
+                ridisegnaTuttoSuBuffer();
+            };
+
+            // --- GESTIONE MOUSE E ZOOM ---
+            const handleWheel = useCallback((e) => {
+                setZoom(prevZoom => {
+                    const factor = e.deltaY > 0 ? 0.9 : 1.1; 
+                    let newZoom = prevZoom * factor;
+                    return Math.max(0.1, Math.min(5.0, newZoom));
+                });
+            }, []);
+
+            const getCoordinateMouse = useCallback((e) => {
+                const rect = contenitoreRef.current.getBoundingClientRect();
+                const x = (e.clientX - rect.left - rect.width / 2) / zoom;
+                const y = (e.clientY - rect.top - rect.height / 2) / zoom;
+                return { x, y };
+            }, [zoom]);
+
+            const handleMouseMove = useCallback((e) => {
+                const coords = getCoordinateMouse(e);
+                if (isDraggingOrigine) {
+                    setOrigineMeccanica(coords);
+                } else {
+                    const dist = Math.hypot(coords.x - origineMeccanica.x, coords.y - origineMeccanica.y);
+                    setIsHoverOrigine(dist < 15 / zoom);
+                }
+            }, [isDraggingOrigine, origineMeccanica, zoom, getCoordinateMouse]);
+
+            const handleMouseDown = useCallback((e) => {
+                if (isHoverOrigine) {
+                    setIsDraggingOrigine(true);
+                }
+            }, [isHoverOrigine]);
+
+            const handleMouseUp = useCallback(() => {
+                setIsDraggingOrigine(false);
+            }, []);
+
+            const handleMouseLeave = useCallback(() => {
+                setIsDraggingOrigine(false);
+                setIsHoverOrigine(false);
+            }, []);
+
+            // --- ANIMAZIONE PRINCIPALE ---
+            const aggiornaAnimazione = useCallback((timestamp) => {
+                const state = statoSimulazione.current;
+                if (!state.ultimoTempo) state.ultimoTempo = timestamp;
+                const dt = (timestamp - state.ultimoTempo) / 1000; 
+                state.ultimoTempo = timestamp;
+
+                const canvas = canvasRef.current;
+                const ctx = canvas?.getContext('2d');
+                
+                if (!canvas || !ctx) return;
+
+                const rect = contenitoreRef.current.getBoundingClientRect();
+                if (canvas.width !== rect.width || canvas.height !== rect.height) {
+                    canvas.width = rect.width;
+                    canvas.height = rect.height;
+                }
+
+                const centroX = canvas.width / 2;
+                const centroY = canvas.height / 2;
+
+                if (inRiproduzione) {
+                    const dtSimulazione = Math.min(dt, 0.1); 
+                    const passi = Math.ceil(velocitaAnimazione);
+                    const dtPasso = (dtSimulazione * velocitaAnimazione) / passi;
+                    
+                    let cicloRilevato = false;
+
+                    for (let i = 0; i < passi; i++) {
+                        state.tempo += dtPasso;
+                        if (!state.percorsoCorrente) iniziaNuovoPercorso();
+
+                        let pennaX = origineMeccanica.x;
+                        let pennaY = origineMeccanica.y;
+                        
+                        ruote.forEach(r => {
+                            const angolo = r.velocita * state.tempo + Number(r.fase);
+                            pennaX += r.raggio * Math.cos(angolo);
+                            pennaY += r.raggio * Math.sin(angolo);
+                        });
+
+                        const angoloFoglio = foglio.velocitaRotazione * state.tempo;
+
+                        const localeX = pennaX * Math.cos(-angoloFoglio) - pennaY * Math.sin(-angoloFoglio);
+                        const localeY = pennaX * Math.sin(-angoloFoglio) + pennaY * Math.cos(-angoloFoglio);
+
+                        if (!state.riferimentoCiclo) {
+                            state.riferimentoCiclo = { x: localeX, y: localeY, tempo: state.tempo };
+                        } else {
+                            const deltaT = state.tempo - state.riferimentoCiclo.tempo;
+                            if (deltaT > 1.0 && !isDraggingOrigine) { 
+                                const allSpeeds = [foglio.velocitaRotazione, ...ruote.map(r => r.velocita)].filter(v => Math.abs(v) > 0.0001);
+                                let tuttoAllineato = allSpeeds.length > 0;
+                                
+                                for (let v of allSpeeds) {
+                                    const cycles = Math.abs(v * deltaT) / (Math.PI * 2);
+                                    const distFromInt = Math.abs(cycles - Math.round(cycles));
+                                    const tolleranzaCiclo = Math.max(0.005, Math.abs(v * dtPasso * 2) / (Math.PI * 2));
+                                    
+                                    if (distFromInt > tolleranzaCiclo) {
+                                        tuttoAllineato = false;
+                                        break;
+                                    }
+                                }
+                                
+                                if (tuttoAllineato) {
+                                    const dist = Math.hypot(localeX - state.riferimentoCiclo.x, localeY - state.riferimentoCiclo.y);
+                                    if (dist < 5.0) {
+                                        cicloRilevato = true;
+                                    }
+                                }
+                            }
+                        }
+
+                        let aggiungiPunto = true;
+                        if (state.ultimoPunto) {
+                            const dist = Math.hypot(state.ultimoPunto.x - localeX, state.ultimoPunto.y - localeY);
+                            if (dist < 0.5) aggiungiPunto = false;
+                        }
+
+                        if (aggiungiPunto && !cicloRilevato) {
+                            state.percorsoCorrente.punti.push({ x: localeX, y: localeY });
+                            
+                            if (state.ultimoPunto) {
+                                const bufferCtx = bufferCanvasRef.current.getContext('2d');
+                                bufferCtx.beginPath();
+                                bufferCtx.strokeStyle = state.percorsoCorrente.colore;
+                                bufferCtx.lineWidth = state.percorsoCorrente.spessore;
+                                bufferCtx.lineCap = 'round';
+                                bufferCtx.lineJoin = 'round';
+                                bufferCtx.moveTo(
+                                    state.ultimoPunto.x + foglio.larghezza / 2, 
+                                    state.ultimoPunto.y + foglio.altezza / 2
+                                );
+                                bufferCtx.lineTo(
+                                    localeX + foglio.larghezza / 2, 
+                                    localeY + foglio.altezza / 2
+                                );
+                                bufferCtx.stroke();
+                            }
+                            state.ultimoPunto = { x: localeX, y: localeY };
+                        }
+
+                        if (cicloRilevato) {
+                            setInRiproduzione(false);
+                            setAvvisoCiclo(true);
+                            break; 
+                        }
+                    }
+                } else {
+                    state.ultimoTempo = timestamp; 
+                }
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                ctx.save();
+                ctx.translate(centroX, centroY);
+                ctx.scale(zoom, zoom);
+
+                // 1. Foglio
+                const angoloFoglioAttuale = foglio.velocitaRotazione * state.tempo;
+                ctx.save();
+                ctx.rotate(angoloFoglioAttuale);
+                ctx.shadowColor = 'rgba(0,0,0,0.3)';
+                ctx.shadowBlur = 15;
+                ctx.shadowOffsetY = 5;
+                ctx.drawImage(
+                    bufferCanvasRef.current, 
+                    -foglio.larghezza / 2, 
+                    -foglio.altezza / 2
+                );
+                ctx.restore();
+
+                // 2. Meccanica
+                let mecX = origineMeccanica.x;
+                let mecY = origineMeccanica.y;
+                
+                ctx.beginPath();
+                if (isHoverOrigine || isDraggingOrigine) {
+                    ctx.fillStyle = '#3b82f6'; 
+                    ctx.shadowColor = '#3b82f6';
+                    ctx.shadowBlur = 12;
+                    ctx.arc(mecX, mecY, 9 / Math.max(0.5, zoom), 0, Math.PI * 2);
+                } else {
+                    ctx.fillStyle = '#64748b'; 
+                    ctx.shadowBlur = 0;
+                    ctx.arc(mecX, mecY, 6 / Math.max(0.5, zoom), 0, Math.PI * 2);
+                }
+                ctx.fill();
+                ctx.shadowBlur = 0; 
+
+                ruote.forEach((r) => {
+                    const angolo = r.velocita * state.tempo + Number(r.fase);
+                    const nextX = mecX + r.raggio * Math.cos(angolo);
+                    const nextY = mecY + r.raggio * Math.sin(angolo);
+
+                    ctx.beginPath();
+                    ctx.strokeStyle = `rgba(100, 116, 139, 0.3)`;
+                    ctx.lineWidth = 1 / zoom;
+                    ctx.arc(mecX, mecY, Math.abs(r.raggio), 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.strokeStyle = '#334155';
+                    ctx.lineWidth = 3 / zoom;
+                    ctx.moveTo(mecX, mecY);
+                    ctx.lineTo(nextX, nextY);
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.fillStyle = '#94a3b8';
+                    ctx.arc(nextX, nextY, 4 / Math.max(0.5, zoom), 0, Math.PI * 2);
+                    ctx.fill();
+
+                    mecX = nextX;
+                    mecY = nextY;
+                });
+
+                ctx.beginPath();
+                ctx.fillStyle = penna.colore;
+                ctx.arc(mecX, mecY, (penna.spessore * 2 + 2) / zoom, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 1.5 / zoom;
+                ctx.stroke();
+
+                ctx.restore(); 
+
+                requestRef.current = requestAnimationFrame(aggiornaAnimazione);
+            }, [inRiproduzione, foglio, ruote, penna, zoom, velocitaAnimazione, origineMeccanica, isHoverOrigine, isDraggingOrigine]);
+
+            useEffect(() => {
+                requestRef.current = requestAnimationFrame(aggiornaAnimazione);
+                return () => cancelAnimationFrame(requestRef.current);
+            }, [aggiornaAnimazione]);
+
+            const handleAggiornaRuota = (id, campo, valore) => {
+                setRuote(ruote.map(r => r.id === id ? { ...r, [campo]: Number(valore) } : r));
+            };
+
+            const handleAggiungiRuota = () => {
+                const nuovaRuota = { id: Date.now().toString(), raggio: 50, velocita: 1, fase: 0 };
+                setRuote([...ruote, nuovaRuota]);
+            };
+
+            const handleRimuoviRuota = (id) => {
+                setRuote(ruote.filter(r => r.id !== id));
+            };
+
+            const esportaSVG = () => {
+                const { percorsi } = statoSimulazione.current;
+                const percorsiPerColore = {};
+                percorsi.forEach(p => {
+                    if (p.punti.length < 2) return;
+                    if (!percorsiPerColore[p.colore]) percorsiPerColore[p.colore] = [];
+                    percorsiPerColore[p.colore].push(p);
+                });
+
+                const coloriUsati = Object.keys(percorsiPerColore);
+                if (coloriUsati.length === 0) {
+                    alert(t.noDraw);
+                    return;
+                }
+
+                coloriUsati.forEach((colore, index) => {
+                    let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="${foglio.larghezza}" height="${foglio.altezza}" viewBox="${-foglio.larghezza/2} ${-foglio.altezza/2} ${foglio.larghezza} ${foglio.altezza}">\n`;
+                    svgContent += `  <rect x="${-foglio.larghezza/2}" y="${-foglio.altezza/2}" width="${foglio.larghezza}" height="${foglio.altezza}" fill="none" stroke="none" />\n`;
+                    
+                    percorsiPerColore[colore].forEach(p => {
+                        const d = `M ${p.punti.map(pt => `${pt.x.toFixed(2)},${pt.y.toFixed(2)}`).join(' L ')}`;
+                        svgContent += `  <path d="${d}" fill="none" stroke="${p.colore}" stroke-width="${p.spessore}" stroke-linejoin="round" stroke-linecap="round" />\n`;
+                    });
+                    svgContent += `</svg>`;
+                    
+                    const blob = new Blob([svgContent], { type: 'image/svg+xml' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    
+                    const hexColore = colore.replace('#', '').toUpperCase();
+                    const nomePulito = (nomeProgetto || 'SpiroPlotter').trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+                    a.download = `${nomePulito}_${hexColore}.svg`;
+                    
+                    setTimeout(() => {
+                        a.click();
+                        URL.revokeObjectURL(url);
+                    }, index * 400);
+                });
+            };
+
+            const salvaParametri = () => {
+                const data = { foglio, penna, ruote, origine: origineMeccanica };
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                const nomePulito = (nomeProgetto || 'SpiroPlotter').trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+                a.download = `${nomePulito}_${Date.now()}.json`; 
+                a.click();
+                URL.revokeObjectURL(url);
+            };
+
+            const caricaParametri = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (evento) => {
+                    try {
+                        const config = JSON.parse(evento.target.result);
+                        if (config.foglio) setFoglio(config.foglio);
+                        if (config.penna) setPenna(config.penna);
+                        if (config.ruote) setRuote(config.ruote);
+                        if (config.origine) setOrigineMeccanica(config.origine); 
+                        pulisciFoglio(); 
+                    } catch (err) {
+                        alert(t.errLoad);
+                    }
+                };
+                reader.readAsText(file);
+            };
+
+            return (
+                <div className="flex h-screen bg-slate-900 text-slate-200 font-sans overflow-hidden">
+                
+                {/* PANNELLO LATERALE */}
+                <div className="w-96 bg-slate-800 border-r border-slate-700 flex flex-col shadow-2xl z-10 flex-shrink-0">
+                    
+                    <div className="p-6 border-b border-slate-700 bg-slate-800/50">
+                        <div className="flex justify-between items-center mb-4">
+                            <h1 className="text-xl font-bold text-white flex items-center gap-2">
+                                <Icon nome="settings" className="w-6 h-6 text-blue-400" />
+                                {t.appName}
+                            </h1>
+                            <button 
+                                onClick={() => setLang(lang === 'en' ? 'it' : 'en')}
+                                className="flex items-center gap-1 text-xs font-bold bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-slate-300 transition-colors"
+                            >
+                                <Icon nome="globe" className="w-3 h-3" /> {lang.toUpperCase()}
+                            </button>
+                        </div>
+                        
+                        <div className="mb-4">
+                            <label className="text-xs text-slate-400 mb-1 block">{t.projectName}</label>
+                            <input 
+                                type="text" 
+                                value={nomeProgetto} 
+                                onChange={(e) => setNomeProgetto(e.target.value)} 
+                                placeholder={t.placeholder}
+                                className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500" 
+                            />
+                        </div>
+                        
+                        <div className="grid grid-cols-3 gap-2 mb-4">
+                            <button 
+                                onClick={() => setInRiproduzione(!inRiproduzione)}
+                                className={`flex flex-col items-center justify-center gap-1 py-2 px-2 rounded-lg font-medium transition-all col-span-1 text-xs ${
+                                    inRiproduzione 
+                                        ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30' 
+                                        : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
+                                }`}
+                            >
+                                {inRiproduzione ? <Icon nome="pause" className="w-4 h-4" /> : <Icon nome="play" className="w-4 h-4" />}
+                                {inRiproduzione ? t.pause : t.start}
+                            </button>
+
+                            <button 
+                                onClick={handleUndo}
+                                className="flex flex-col items-center justify-center gap-1 py-2 px-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-all col-span-1 text-xs"
+                            >
+                                <Icon nome="undo" className="w-4 h-4" />
+                                {t.undo}
+                            </button>
+
+                            <button 
+                                onClick={pulisciFoglio}
+                                className="flex flex-col items-center justify-center gap-1 py-2 px-2 bg-slate-700 text-red-300 rounded-lg hover:bg-slate-600 transition-all col-span-1 text-xs"
+                            >
+                                <Icon nome="trash" className="w-4 h-4" />
+                                {t.clear}
+                            </button>
+                        </div>
+
+                        <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700">
+                            <label className="text-xs text-slate-400 flex items-center justify-between mb-2 font-semibold">
+                                <span className="flex items-center gap-1"><Icon nome="fastForward" className="w-3 h-3" /> {t.timeAcc}</span> 
+                                <span className="text-blue-400">{velocitaAnimazione}x</span>
+                            </label>
+                            <input 
+                                type="range" min="0.5" max="10" step="0.5" 
+                                value={velocitaAnimazione}
+                                onChange={(e) => setVelocitaAnimazione(Number(e.target.value))}
+                                className="w-full accent-blue-500"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+                        
+                        <section className="space-y-4">
+                            <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                                <Icon nome="rotate" className="w-4 h-4" /> {t.paperProp}
+                            </h2>
+                            <div className="space-y-3 bg-slate-900/50 p-4 rounded-xl border border-slate-700">
+                                <div className="flex justify-between items-center">
+                                    <label className="text-sm">{t.paperColor}</label>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs font-mono text-slate-400">{foglio.colore.toUpperCase()}</span>
+                                        <input 
+                                            type="color" value={foglio.colore} 
+                                            onChange={(e) => setFoglio({...foglio, colore: e.target.value})}
+                                            className="w-8 h-8 rounded cursor-pointer bg-transparent border-0"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-sm flex justify-between mb-1">
+                                        {t.rotSpeed} <span>{foglio.velocitaRotazione.toFixed(2)} rad/s</span>
+                                    </label>
+                                    <input 
+                                        type="range" min="-2" max="2" step="0.05" value={foglio.velocitaRotazione}
+                                        onChange={(e) => setFoglio({...foglio, velocitaRotazione: Number(e.target.value)})}
+                                        className="w-full accent-blue-500"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-xs text-slate-400">{t.width}</label>
+                                        <input type="number" value={foglio.larghezza} onChange={(e) => setFoglio({...foglio, larghezza: Number(e.target.value)})} className="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-white" />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs text-slate-400">{t.height}</label>
+                                        <input type="number" value={foglio.altezza} onChange={(e) => setFoglio({...foglio, altezza: Number(e.target.value)})} className="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-white" />
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section className="space-y-4">
+                            <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                                <Icon nome="pen" className="w-4 h-4" /> {t.penTool}
+                            </h2>
+                            <div className="space-y-3 bg-slate-900/50 p-4 rounded-xl border border-slate-700">
+                                <p className="text-xs text-amber-400 mb-2">{t.penHint}</p>
+                                <div className="flex justify-between items-center">
+                                    <label className="text-sm">{t.inkColor}</label>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs font-mono text-slate-400">{penna.colore.toUpperCase()}</span>
+                                        <input 
+                                            type="color" value={penna.colore} 
+                                            onChange={(e) => setPenna({...penna, colore: e.target.value})}
+                                            className="w-8 h-8 rounded cursor-pointer bg-transparent border-0"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-sm flex justify-between mb-1">
+                                        {t.thickness} <span>{penna.spessore} px</span>
+                                    </label>
+                                    <input 
+                                        type="range" min="0.5" max="10" step="0.5" value={penna.spessore}
+                                        onChange={(e) => setPenna({...penna, spessore: Number(e.target.value)})}
+                                        className="w-full accent-blue-500"
+                                    />
+                                </div>
+                            </div>
+                        </section>
+
+                        <section className="space-y-4">
+                            <div className="flex justify-between items-center">
+                                <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">{t.kinematics}</h2>
+                                <button onClick={handleAggiungiRuota} className="text-blue-400 hover:text-blue-300 flex items-center gap-1 text-sm">
+                                    <Icon nome="plus" className="w-4 h-4" /> {t.add}
+                                </button>
+                            </div>
+                            
+                            <div className="space-y-3">
+                                {ruote.map((r, index) => (
+                                    <div key={r.id} className="bg-slate-900/50 p-4 rounded-xl border border-slate-700 relative group">
+                                        <div className="absolute -left-3 top-4 bg-blue-500 text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center text-white border-2 border-slate-800">
+                                            {index + 1}
+                                        </div>
+                                        <button onClick={() => handleRimuoviRuota(r.id)} className="absolute top-2 right-2 text-slate-500 hover:text-red-400 transition-colors">
+                                            <Icon nome="trash" className="w-4 h-4" />
+                                        </button>
+                                        
+                                        <div className="space-y-3 pl-2">
+                                            <div>
+                                                <label className="text-xs text-slate-400 flex justify-between">
+                                                    {t.radLen} <span>{r.raggio}</span>
+                                                </label>
+                                                <input type="range" min="-300" max="300" step="1" value={r.raggio} onChange={(e) => handleAggiornaRuota(r.id, 'raggio', e.target.value)} className="w-full accent-slate-400 h-1" />
+                                            </div>
+                                            <div>
+                                                <label className="text-xs text-slate-400 flex justify-between">
+                                                    {t.motSpeed} <span>{r.velocita}</span>
+                                                </label>
+                                                <input type="range" min="-10" max="10" step="0.1" value={r.velocita} onChange={(e) => handleAggiornaRuota(r.id, 'velocita', e.target.value)} className="w-full accent-slate-400 h-1" />
+                                            </div>
+                                            <div>
+                                                <label className="text-xs text-slate-400 flex justify-between">
+                                                    {t.phase} <span>{r.fase.toFixed(2)}</span>
+                                                </label>
+                                                <input type="range" min="0" max={Math.PI * 2} step="0.1" value={r.fase} onChange={(e) => handleAggiornaRuota(r.id, 'fase', e.target.value)} className="w-full accent-slate-400 h-1" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </section>
+                    </div>
+
+                    <div className="p-4 border-t border-slate-700 bg-slate-900 grid grid-cols-3 gap-2 text-xs">
+                        <button onClick={esportaSVG} className="flex flex-col items-center justify-center text-center gap-1 p-2 bg-slate-800 hover:bg-slate-700 rounded transition-colors text-slate-300 hover:text-white">
+                            <Icon nome="download" className="w-4 h-4" /> {t.expSvg}
+                        </button>
+                        <button onClick={salvaParametri} className="flex flex-col items-center justify-center text-center gap-1 p-2 bg-slate-800 hover:bg-slate-700 rounded transition-colors text-slate-300 hover:text-white">
+                            <Icon nome="save" className="w-4 h-4" /> {t.saveSetup}
+                        </button>
+                        <label className="flex flex-col items-center justify-center text-center gap-1 p-2 bg-slate-800 hover:bg-slate-700 rounded transition-colors text-slate-300 hover:text-white cursor-pointer">
+                            <Icon nome="upload" className="w-4 h-4" /> {t.loadSetup}
+                            <input type="file" accept=".json" className="hidden" onChange={caricaParametri} />
+                        </label>
+                    </div>
+
+                </div>
+
+                {/* AREA DISEGNO */}
+                <div 
+                    className="flex-1 relative bg-slate-950 overflow-hidden" 
+                    ref={contenitoreRef}
+                    onWheel={handleWheel}
+                    onMouseMove={handleMouseMove}
+                    onMouseDown={handleMouseDown}
+                    onMouseUp={handleMouseUp}
+                    onMouseLeave={handleMouseLeave}
+                >
+                    
+                    {avvisoCiclo && (
+                        <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-amber-500/95 text-slate-900 px-6 py-4 rounded-xl shadow-2xl flex items-center gap-4 backdrop-blur z-50 animate-bounce">
+                            <Icon nome="alert" className="w-8 h-8 flex-shrink-0" />
+                            <div>
+                                <h3 className="font-bold text-lg">{t.completed}</h3>
+                                <p className="text-sm font-medium">{t.cycleMsg}</p>
+                            </div>
+                            <button onClick={() => setAvvisoCiclo(false)} className="ml-4 px-4 py-2 bg-slate-900/10 hover:bg-slate-900/20 rounded-lg font-bold transition-colors">
+                                {t.ok}
+                            </button>
+                        </div>
+                    )}
+
+                    <div className="absolute inset-0 pointer-events-none opacity-20" 
+                        style={{ backgroundImage: 'radial-gradient(#334155 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+                    
+                    {zoom !== 1 && (
+                        <div className="absolute bottom-4 right-4 bg-slate-900/80 text-slate-400 text-xs px-2 py-1 rounded font-mono border border-slate-700 pointer-events-none">
+                            Zoom: {Math.round(zoom * 100)}%
+                        </div>
+                    )}
+
+                    <canvas 
+                        ref={canvasRef} 
+                        className={`absolute inset-0 w-full h-full block touch-none ${
+                            isDraggingOrigine || isHoverOrigine ? 'cursor-move' : 'cursor-crosshair'
+                        }`}
+                    />
+                    
+                    {!inRiproduzione && statoSimulazione.current.tempo === 0 && (
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="bg-slate-900/80 backdrop-blur px-6 py-4 rounded-2xl border border-slate-700 text-center animate-pulse">
+                                <p className="text-lg font-medium text-slate-200">{t.pressStart}</p>
+                                <p className="text-sm text-slate-400 mt-1">{t.configHint}</p>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
