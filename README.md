@@ -60,7 +60,7 @@ State Management: Optimized local state for real-time parameter scrubbing withou
 
 Clone the repository
 
-git clone [https://github.com/your-username/spiroplotter-studio.git](https://github.com/your-username/spiroplotter-studio.git)
+git clone [https://github.com/salvmecai-cpu/SpiralPlotterStudio.git](https://github.com/salvmecai-cpu/SpiralPlotterStudio.git)
 
 
 Install dependencies
