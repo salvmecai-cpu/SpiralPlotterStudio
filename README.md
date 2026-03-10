@@ -40,11 +40,13 @@ Variable Resolution: Adjust the sampling rate (step size) to balance between sim
 
 4. Export & Compatibility
 
-Vector Export (SVG): Generate clean, mathematical SVG paths perfect for Adobe Illustrator, Inkscape, or Laser Cutters.
+Multi-Color SVG Export: If a drawing contains multiple colors, the system automatically generates a separate SVG file for each color.
 
-Pen Plotter Optimization: Paths are generated as continuous polylines, making them ideal for machines like AxiDraw or other CNC plotters.
+Pen Plotter Optimization: * Each exported SVG maintains the exact same canvas dimensions.
 
-Image Export: High-resolution PNG snapshots for digital sharing.
+This facilitates precise alignment and registration during multi-pass plotting on machines like the AxiDraw or PolarDraw.
+
+Paths are exported as continuous polylines for optimal machine efficiency.
 
 🛠️ Tech Stack
 
